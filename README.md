@@ -1,4 +1,11 @@
-freezing-tyrion
+SimpleOfficeReader
 ===============
 
-A simple office file reader can extract content and summary information from .doc,.docx,.ppt,.pptx files.
+A simple office file reader can extract content and summary information from .doc,.docx,.ppt,.pptx files without Microsoft Office or interop.
+
+一个简单的Office文件读取工具，可以不需要借助Microsoft Office软件及Interop抽取.doc,.docx,.ppt,.pptx文件的内容和摘要信息。
+
+There're four Chinese articles about office basic type: <a href="http://www.cnblogs.com/mayswind/archive/2013/03/17/2962205.html" target="_blank">http://www.cnblogs.com/mayswind/archive/2013/03/17/2962205.html</a>
+
+有四篇中文的文章关于Office文件的基本格式：
+<a href="http://www.cnblogs.com/mayswind/archive/2013/03/17/2962205.html" target="_blank">http://www.cnblogs.com/mayswind/archive/2013/03/17/2962205.html</a>
