@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotMaysWind.OfficeReader", "DotMaysWind.OfficeReader\DotMaysWind.OfficeReader.csproj", "{28767CD6-4ED2-46D1-A5BE-C01E84CC1AC7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotMaysWind.Office", "DotMaysWind.Office\DotMaysWind.Office.csproj", "{DBDD5BF8-FF40-4CCC-AA34-E27A6B6DCDBC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{28767CD6-4ED2-46D1-A5BE-C01E84CC1AC7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{28767CD6-4ED2-46D1-A5BE-C01E84CC1AC7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{28767CD6-4ED2-46D1-A5BE-C01E84CC1AC7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{28767CD6-4ED2-46D1-A5BE-C01E84CC1AC7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DBDD5BF8-FF40-4CCC-AA34-E27A6B6DCDBC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DBDD5BF8-FF40-4CCC-AA34-E27A6B6DCDBC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DBDD5BF8-FF40-4CCC-AA34-E27A6B6DCDBC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DBDD5BF8-FF40-4CCC-AA34-E27A6B6DCDBC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
