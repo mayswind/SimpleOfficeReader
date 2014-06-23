@@ -412,13 +412,13 @@ namespace DotMaysWind.Office
 
             while (true)
             {
-                sectorIDs.Add(sectorID);
-                sectorID = this.GetNextSectorID(sectorID, (entry.Length >= this._miniCutoffSize));
-
                 if (sectorID == CompoundBinaryFile.EndOfChain || sectorID == CompoundBinaryFile.FreeSector)
                 {
                     break;
                 }
+                
+                sectorIDs.Add(sectorID);
+                sectorID = this.GetNextSectorID(sectorID, (entry.Length >= this._miniCutoffSize));
             }
 
             this._entrySectorIDs[entry.EntryID] = sectorIDs;
