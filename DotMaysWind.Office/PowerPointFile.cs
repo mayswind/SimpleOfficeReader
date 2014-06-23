@@ -11,6 +11,9 @@ namespace DotMaysWind.Office
     public class PowerPointFile : CompoundBinaryFile, IPowerPointFile
     {
         #region 字段
+        private MemoryStream _contentStream;
+        private BinaryReader _contentReader;
+
         private List<PowerPointRecord> _records;
         private StringBuilder _allText;
         #region 测试方法
@@ -57,28 +60,43 @@ namespace DotMaysWind.Office
                 return;
             }
 
-            Int64 entryStart = this.GetEntryOffset(entry);
-            this._stream.Seek(entryStart, SeekOrigin.Begin);
-
-            #region 测试方法
-            this._recordTree = new StringBuilder();
-            #endregion
-
-            this._allText = new StringBuilder();
-            this._records = new List<PowerPointRecord>();
-            PowerPointRecord record = null;
-
-            while (this._stream.Position < this._stream.Length)
+            try
             {
-                record = this.ReadRecord(null);
+                this._contentStream = new MemoryStream(this._entryData[entry.EntryID]);
+                this._contentReader = new BinaryReader(this._contentStream);
 
-                if (record == null || record.RecordType == 0)
+                #region 测试方法
+                this._recordTree = new StringBuilder();
+                #endregion
+
+                this._allText = new StringBuilder();
+                this._records = new List<PowerPointRecord>();
+                PowerPointRecord record = null;
+
+                while (this._contentStream.Position < this._contentStream.Length)
                 {
-                    break;
+                    record = this.ReadRecord(null);
+
+                    if (record == null || record.RecordType == 0)
+                    {
+                        break;
+                    }
+                }
+
+                this._allText = new StringBuilder(StringHelper.ReplaceString(this._allText.ToString()));
+            }
+            finally
+            {
+                if (this._contentReader != null)
+                {
+                    this._contentReader.Close();
+                }
+
+                if (this._contentStream != null)
+                {
+                    this._contentStream.Close();
                 }
             }
-
-            this._allText = new StringBuilder(StringHelper.ReplaceString(this._allText.ToString()));
         }
 
         private PowerPointRecord ReadRecord(PowerPointRecord parent)
@@ -109,7 +127,7 @@ namespace DotMaysWind.Office
 
             if (record.RecordVersion == 0xF)
             {
-                while (this._stream.Position < record.Offset + record.RecordLength)
+                while (this._contentStream.Position < record.Offset + record.RecordLength)
                 {
                     this.ReadRecord(record);
                 }
@@ -123,25 +141,32 @@ namespace DotMaysWind.Office
                 {
                     if (record.RecordType == RecordType.TextCharsAtom || record.RecordType == RecordType.CString)//找到Unicode双字节文字内容
                     {
-                        Byte[] data = this._reader.ReadBytes((Int32)record.RecordLength);
+                        Byte[] data = this._contentReader.ReadBytes((Int32)record.RecordLength);
                         this._allText.Append(StringHelper.GetString(true, data));
                         this._allText.AppendLine();
 
                     }
                     else if (record.RecordType == RecordType.TextBytesAtom)//找到Unicode<256单字节文字内容
                     {
-                        Byte[] data = this._reader.ReadBytes((Int32)record.RecordLength);
+                        Byte[] data = this._contentReader.ReadBytes((Int32)record.RecordLength);
                         this._allText.Append(StringHelper.GetString(false, data));
                         this._allText.AppendLine();
                     }
                     else
                     {
-                        this._stream.Seek(record.RecordLength, SeekOrigin.Current);
+                        this._contentStream.Seek(record.RecordLength, SeekOrigin.Current);
                     }
                 }
                 else
                 {
-                    this._stream.Seek(record.RecordLength, SeekOrigin.Current);
+                    if (this._contentStream.Position + record.RecordLength < this._contentStream.Length)
+                    {
+                        this._contentStream.Seek(record.RecordLength, SeekOrigin.Current);
+                    }
+                    else
+                    {
+                        this._contentStream.Seek(0, SeekOrigin.End);
+                    }
                 }
             }
 
@@ -150,16 +175,16 @@ namespace DotMaysWind.Office
 
         private PowerPointRecord GetRecord(PowerPointRecord parent)
         {
-            if (this._stream.Position >= this._stream.Length)
+            if (this._contentStream.Position + 8 >= this._contentStream.Length)
             {
                 return null;
             }
 
-            UInt16 version = this._reader.ReadUInt16();
-            UInt16 type = this._reader.ReadUInt16();
-            UInt32 length = this._reader.ReadUInt32();
+            UInt16 version = this._contentReader.ReadUInt16();
+            UInt16 type = this._contentReader.ReadUInt16();
+            UInt32 length = this._contentReader.ReadUInt32();
 
-            return new PowerPointRecord(parent, version, type, length, this._stream.Position);
+            return new PowerPointRecord(parent, version, type, length, this._contentStream.Position);
         }
         #endregion
     }

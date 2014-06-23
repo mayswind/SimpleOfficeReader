@@ -29,6 +29,9 @@ namespace DotMaysWind.Office
         protected List<UInt32> _miniSectors;
         protected List<UInt32> _dirSectors;
         protected DirectoryEntry _dirRootEntry;
+        protected Dictionary<UInt32, List<UInt32>> _entrySectorIDs;
+        protected Dictionary<UInt32, Byte[]> _entryData;
+
         protected List<DocumentSummaryInformation> _documentSummaryInformation;
         protected List<SummaryInformation> _summaryInformation;
 
@@ -110,6 +113,8 @@ namespace DotMaysWind.Office
                 this.ReadFAT();
                 this.ReadDirectory();
                 this.ReadMiniFAT();
+                this.ReadEntryData();
+
                 this.ReadDocumentSummaryInformation();
                 this.ReadSummaryInformation();
                 this.ReadContent();
@@ -205,7 +210,7 @@ namespace DotMaysWind.Office
 
             while (true)
             {
-                Int64 entryStart = this.GetSectorOffset(difSectorID);
+                Int64 entryStart = this.GetNormalSectorOffset(difSectorID);
                 this._stream.Seek(entryStart, SeekOrigin.Begin);
 
                 for (Int32 i = 0; i < 127; i++)
@@ -238,12 +243,13 @@ namespace DotMaysWind.Office
             }
 
             this._dirSectors = new List<UInt32>();
+
             UInt32 sectorID = this._dirStartSectorID;
 
             while (true)
             {
                 this._dirSectors.Add(sectorID);
-                sectorID = this.GetNextSectorID(sectorID);
+                sectorID = this.GetNextNormalSectorID(sectorID);
 
                 if (sectorID == CompoundBinaryFile.EndOfChain)
                 {
@@ -318,10 +324,10 @@ namespace DotMaysWind.Office
             childEntryID = this._reader.ReadUInt32();
 
             this._stream.Seek(36, SeekOrigin.Current);
-            UInt32 sectorID = this._reader.ReadUInt32();
+            UInt32 firstSectorID = this._reader.ReadUInt32();
             UInt32 length = this._reader.ReadUInt32();
 
-            return new DirectoryEntry(parentEntry, entryID, name, (DirectoryEntryType)type, sectorID, length);
+            return new DirectoryEntry(parentEntry, entryID, name, (DirectoryEntryType)type, firstSectorID, length);
         }
         #endregion
 
@@ -353,7 +359,7 @@ namespace DotMaysWind.Office
             while (true)
             {
                 this._minifatSectors.Add(sectorID);
-                sectorID = this.GetNextSectorID(sectorID);
+                sectorID = this.GetNextNormalSectorID(sectorID);
 
                 if (sectorID == CompoundBinaryFile.EndOfChain)
                 {
@@ -364,17 +370,79 @@ namespace DotMaysWind.Office
 
         private void ReadMiniSectors()
         {
-            UInt32 sectorID = this._dirRootEntry.SectorID;
+            UInt32 sectorID = this._dirRootEntry.FirstSectorID;
 
             while (true)
             {
                 this._miniSectors.Add(sectorID);
-                sectorID = this.GetNextSectorID(sectorID);
+                sectorID = this.GetNextNormalSectorID(sectorID);
 
                 if (sectorID == CompoundBinaryFile.EndOfChain)
                 {
                     break;
                 }
+            }
+        }
+        #endregion
+
+        #region 读取Entry内容
+        private void ReadEntryData()
+        {
+            if (this._reader == null)
+            {
+                return;
+            }
+
+            this._entrySectorIDs = new Dictionary<UInt32, List<UInt32>>();
+            this._entryData = new Dictionary<UInt32, Byte[]>();
+
+            for (Int32 i = 0; i < this._dirRootEntry.Children.Count; i++)
+            {
+                DirectoryEntry entry = this._dirRootEntry.Children[i];
+
+                this.ReadEntryOrder(entry);
+                this.CopyEntryData(entry);
+            }
+        }
+
+        private void ReadEntryOrder(DirectoryEntry entry)
+        {
+            List<UInt32> sectorIDs = new List<UInt32>();
+            UInt32 sectorID = entry.FirstSectorID;
+
+            while (true)
+            {
+                sectorIDs.Add(sectorID);
+                sectorID = this.GetNextSectorID(sectorID, (entry.Length >= this._miniCutoffSize));
+
+                if (sectorID == CompoundBinaryFile.EndOfChain || sectorID == CompoundBinaryFile.FreeSector)
+                {
+                    break;
+                }
+            }
+
+            this._entrySectorIDs[entry.EntryID] = sectorIDs;
+        }
+
+        private void CopyEntryData(DirectoryEntry entry)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            {
+                List<UInt32> sectorIDs = this._entrySectorIDs[entry.EntryID];
+
+                for (Int32 i = 0; i < sectorIDs.Count; i++)
+                {
+                    Int64 offset = GetSectorOffset(sectorIDs[i], (entry.Length >= this._miniCutoffSize));
+                    UInt32 count = (entry.Length >= this._miniCutoffSize) ? this._sectorSize : this._miniSectorSize;
+
+                    Byte[] buff = new Byte[count];
+                    this._stream.Seek(offset, SeekOrigin.Begin);
+                    this._stream.Read(buff, 0, (Int32)count);
+
+                    stream.Write(buff, 0, (Int32)count);
+                }
+
+                this._entryData[entry.EntryID] = stream.ToArray();
             }
         }
         #endregion
@@ -389,90 +457,91 @@ namespace DotMaysWind.Office
                 return;
             }
 
-            Int64 entryStart = this.GetEntryOffset(entry);
-
-            this._stream.Seek(entryStart + 24, SeekOrigin.Begin);
-            UInt32 propertysCount = this._reader.ReadUInt32();
-            UInt32 docSumamryStart = 0;
-
-            for (Int32 i = 0; i < propertysCount; i++)
+            this.LoadEntry(entry, new Action<Stream, BinaryReader>((stream, reader) =>
             {
-                Byte[] clsid = this._reader.ReadBytes(16);
-                if (clsid.Length == 16 && 
-                    clsid[0] == 0x02 && clsid[1] == 0xD5 && clsid[2] == 0xCD && clsid[3] == 0xD5 &&
-                    clsid[4] == 0x9C && clsid[5] == 0x2E && clsid[6] == 0x1B && clsid[7] == 0x10 &&
-                    clsid[8] == 0x93 && clsid[9] == 0x97 && clsid[10] == 0x08 && clsid[11] == 0x00 &&
-                    clsid[12] == 0x2B && clsid[13] == 0x2C && clsid[14] == 0xF9 && clsid[15] == 0xAE)//如果是DocumentSummaryInformation
+                stream.Seek(24, SeekOrigin.Begin);
+                UInt32 propertysCount = reader.ReadUInt32();
+                UInt32 docSumamryStart = 0;
+
+                for (Int32 i = 0; i < propertysCount; i++)
                 {
-                    docSumamryStart = this._reader.ReadUInt32();
-                    break;
-                }
-                else
-                {
-                    //this._stream.Seek(4, SeekOrigin.Current);
-                    return;
-                }
-            }
-
-            if (docSumamryStart == 0)
-            {
-                return;
-            }
-
-            this._stream.Seek(entryStart + docSumamryStart, SeekOrigin.Begin);
-            this._documentSummaryInformation = new List<DocumentSummaryInformation>();
-            UInt32 docSummarySize = this._reader.ReadUInt32();
-            UInt32 docSummaryCount = this._reader.ReadUInt32();
-            Int64 offsetMark = this._stream.Position;
-            Int32 codePage = Encoding.Default.CodePage;
-
-            for (Int32 i = 0; i < docSummaryCount; i++)
-            {
-                if (offsetMark >= this._stream.Length)
-                {
-                    break;
-                }
-
-                this._stream.Seek(offsetMark, SeekOrigin.Begin);
-                UInt32 propertyID = this._reader.ReadUInt32();
-                UInt32 properyOffset = this._reader.ReadUInt32();
-
-                offsetMark = this._stream.Position;
-
-                this._stream.Seek(entryStart + docSumamryStart + properyOffset, SeekOrigin.Begin);
-
-                if (this._stream.Position > this._stream.Length)
-                {
-                    continue;
-                }
-
-                this._stream.Seek(entryStart + docSumamryStart + properyOffset, SeekOrigin.Begin);
-                UInt32 propertyType = this._reader.ReadUInt32();
-                DocumentSummaryInformation info = null;
-                Byte[] data = null;
-
-                if (propertyType == 0x1E)
-                {
-                    UInt32 strLen = this._reader.ReadUInt32();
-                    data = this._reader.ReadBytes((Int32)strLen);
-                    info = new DocumentSummaryInformation(propertyID, propertyType, codePage, data);
-                }
-                else
-                {
-                    data = this._reader.ReadBytes(4);
-                    info = new DocumentSummaryInformation(propertyID, propertyType, data);
-
-                    if (info.Type == DocumentSummaryInformationType.CodePage && info.Data != null)//如果找到CodePage的属性
+                    Byte[] clsid = reader.ReadBytes(16);
+                    if (clsid.Length == 16 &&
+                        clsid[0] == 0x02 && clsid[1] == 0xD5 && clsid[2] == 0xCD && clsid[3] == 0xD5 &&
+                        clsid[4] == 0x9C && clsid[5] == 0x2E && clsid[6] == 0x1B && clsid[7] == 0x10 &&
+                        clsid[8] == 0x93 && clsid[9] == 0x97 && clsid[10] == 0x08 && clsid[11] == 0x00 &&
+                        clsid[12] == 0x2B && clsid[13] == 0x2C && clsid[14] == 0xF9 && clsid[15] == 0xAE)//如果是DocumentSummaryInformation
                     {
-                        codePage = (Int32)(UInt16)info.Data;
+                        docSumamryStart = reader.ReadUInt32();
+                        break;
+                    }
+                    else
+                    {
+                        //stream.Seek(4, SeekOrigin.Current);
+                        return;
                     }
                 }
 
-                if (info.Data != null)
+                if (docSumamryStart == 0)
                 {
-                    this._documentSummaryInformation.Add(info);
+                    return;
                 }
-            }
+
+                stream.Seek(docSumamryStart, SeekOrigin.Begin);
+                this._documentSummaryInformation = new List<DocumentSummaryInformation>();
+                UInt32 docSummarySize = reader.ReadUInt32();
+                UInt32 docSummaryCount = reader.ReadUInt32();
+                Int64 offsetMark = stream.Position;
+                Int32 codePage = Encoding.Default.CodePage;
+
+                for (Int32 i = 0; i < docSummaryCount; i++)
+                {
+                    if (offsetMark >= stream.Length)
+                    {
+                        break;
+                    }
+
+                    stream.Seek(offsetMark, SeekOrigin.Begin);
+                    UInt32 propertyID = reader.ReadUInt32();
+                    UInt32 properyOffset = reader.ReadUInt32();
+
+                    offsetMark = stream.Position;
+
+                    stream.Seek(docSumamryStart + properyOffset, SeekOrigin.Begin);
+
+                    if (stream.Position > stream.Length)
+                    {
+                        continue;
+                    }
+
+                    stream.Seek(docSumamryStart + properyOffset, SeekOrigin.Begin);
+                    UInt32 propertyType = reader.ReadUInt32();
+                    DocumentSummaryInformation info = null;
+                    Byte[] data = null;
+
+                    if (propertyType == 0x1E)
+                    {
+                        UInt32 strLen = reader.ReadUInt32();
+                        data = reader.ReadBytes((Int32)strLen);
+                        info = new DocumentSummaryInformation(propertyID, propertyType, codePage, data);
+                    }
+                    else
+                    {
+                        data = reader.ReadBytes(4);
+                        info = new DocumentSummaryInformation(propertyID, propertyType, data);
+
+                        if (info.Type == DocumentSummaryInformationType.CodePage && info.Data != null)//如果找到CodePage的属性
+                        {
+                            codePage = (Int32)(UInt16)info.Data;
+                        }
+                    }
+
+                    if (info.Data != null)
+                    {
+                        this._documentSummaryInformation.Add(info);
+                    }
+                }
+            }));
         }
         #endregion
 
@@ -486,94 +555,95 @@ namespace DotMaysWind.Office
                 return;
             }
 
-            Int64 entryStart = this.GetEntryOffset(entry);
-
-            this._stream.Seek(entryStart + 24, SeekOrigin.Begin);
-            UInt32 propertysCount = this._reader.ReadUInt32();
-            UInt32 docSumamryStart = 0;
-
-            for (Int32 i = 0; i < propertysCount; i++)
+            this.LoadEntry(entry, new Action<Stream, BinaryReader>((stream, reader) =>
             {
-                Byte[] clsid = this._reader.ReadBytes(16);
-                if (clsid.Length == 16 &&
-                    clsid[0] == 0xE0 && clsid[1] == 0x85 && clsid[2] == 0x9F && clsid[3] == 0xF2 &&
-                    clsid[4] == 0xF9 && clsid[5] == 0x4F && clsid[6] == 0x68 && clsid[7] == 0x10 &&
-                    clsid[8] == 0xAB && clsid[9] == 0x91 && clsid[10] == 0x08 && clsid[11] == 0x00 &&
-                    clsid[12] == 0x2B && clsid[13] == 0x27 && clsid[14] == 0xB3 && clsid[15] == 0xD9)//如果是SummaryInformation
+                stream.Seek(24, SeekOrigin.Begin);
+                UInt32 propertysCount = reader.ReadUInt32();
+                UInt32 docSumamryStart = 0;
+
+                for (Int32 i = 0; i < propertysCount; i++)
                 {
-                    docSumamryStart = this._reader.ReadUInt32();
-                    break;
-                }
-                else
-                {
-                    //this._stream.Seek(4, SeekOrigin.Current);
-                    return;
-                }
-            }
-
-            if (docSumamryStart == 0)
-            {
-                return;
-            }
-
-            this._stream.Seek(entryStart + docSumamryStart, SeekOrigin.Begin);
-            this._summaryInformation = new List<SummaryInformation>();
-            UInt32 docSummarySize = this._reader.ReadUInt32();
-            UInt32 docSummaryCount = this._reader.ReadUInt32();
-            Int64 offsetMark = this._stream.Position;
-            Int32 codePage = Encoding.Default.CodePage;
-
-            for (Int32 i = 0; i < docSummaryCount; i++)
-            {
-                if (offsetMark >= this._stream.Length)
-                {
-                    break;
-                }
-
-                this._stream.Seek(offsetMark, SeekOrigin.Begin);
-                UInt32 propertyID = this._reader.ReadUInt32();
-                UInt32 properyOffset = this._reader.ReadUInt32();
-
-                offsetMark = this._stream.Position;
-
-                this._stream.Seek(entryStart + docSumamryStart + properyOffset, SeekOrigin.Begin);
-
-                if (this._stream.Position > this._stream.Length)
-                {
-                    continue;
-                }
-
-                UInt32 propertyType = this._reader.ReadUInt32();
-                SummaryInformation info = null;
-                Byte[] data = null;
-
-                if (propertyType == 0x1E)
-                {
-                    UInt32 strLen = this._reader.ReadUInt32();
-                    data = this._reader.ReadBytes((Int32)strLen);
-                    info = new SummaryInformation(propertyID, propertyType, codePage, data);
-                }
-                else if (propertyType == 0x40)
-                {
-                    data = this._reader.ReadBytes(8);
-                    info = new SummaryInformation(propertyID, propertyType, data);
-                }
-                else
-                {
-                    data = this._reader.ReadBytes(4);
-                    info = new SummaryInformation(propertyID, propertyType, data);
-
-                    if (info.Type == SummaryInformationType.CodePage && info.Data != null)//如果找到CodePage的属性
+                    Byte[] clsid = reader.ReadBytes(16);
+                    if (clsid.Length == 16 &&
+                        clsid[0] == 0xE0 && clsid[1] == 0x85 && clsid[2] == 0x9F && clsid[3] == 0xF2 &&
+                        clsid[4] == 0xF9 && clsid[5] == 0x4F && clsid[6] == 0x68 && clsid[7] == 0x10 &&
+                        clsid[8] == 0xAB && clsid[9] == 0x91 && clsid[10] == 0x08 && clsid[11] == 0x00 &&
+                        clsid[12] == 0x2B && clsid[13] == 0x27 && clsid[14] == 0xB3 && clsid[15] == 0xD9)//如果是SummaryInformation
                     {
-                        codePage = (Int32)(UInt16)info.Data;
+                        docSumamryStart = reader.ReadUInt32();
+                        break;
+                    }
+                    else
+                    {
+                        //stream.Seek(4, SeekOrigin.Current);
+                        return;
                     }
                 }
 
-                if (info.Data != null)
+                if (docSumamryStart == 0)
                 {
-                    this._summaryInformation.Add(info);
+                    return;
                 }
-            }
+
+                stream.Seek(docSumamryStart, SeekOrigin.Begin);
+                this._summaryInformation = new List<SummaryInformation>();
+                UInt32 docSummarySize = reader.ReadUInt32();
+                UInt32 docSummaryCount = reader.ReadUInt32();
+                Int64 offsetMark = stream.Position;
+                Int32 codePage = Encoding.Default.CodePage;
+
+                for (Int32 i = 0; i < docSummaryCount; i++)
+                {
+                    if (offsetMark >= stream.Length)
+                    {
+                        break;
+                    }
+
+                    stream.Seek(offsetMark, SeekOrigin.Begin);
+                    UInt32 propertyID = reader.ReadUInt32();
+                    UInt32 properyOffset = reader.ReadUInt32();
+
+                    offsetMark = stream.Position;
+
+                    stream.Seek(docSumamryStart + properyOffset, SeekOrigin.Begin);
+
+                    if (stream.Position > stream.Length)
+                    {
+                        continue;
+                    }
+
+                    UInt32 propertyType = reader.ReadUInt32();
+                    SummaryInformation info = null;
+                    Byte[] data = null;
+
+                    if (propertyType == 0x1E)
+                    {
+                        UInt32 strLen = reader.ReadUInt32();
+                        data = reader.ReadBytes((Int32)strLen);
+                        info = new SummaryInformation(propertyID, propertyType, codePage, data);
+                    }
+                    else if (propertyType == 0x40)
+                    {
+                        data = reader.ReadBytes(8);
+                        info = new SummaryInformation(propertyID, propertyType, data);
+                    }
+                    else
+                    {
+                        data = reader.ReadBytes(4);
+                        info = new SummaryInformation(propertyID, propertyType, data);
+
+                        if (info.Type == SummaryInformationType.CodePage && info.Data != null)//如果找到CodePage的属性
+                        {
+                            codePage = (Int32)(UInt16)info.Data;
+                        }
+                    }
+
+                    if (info.Data != null)
+                    {
+                        this._summaryInformation.Add(info);
+                    }
+                }
+            }));
         }
         #endregion
 
@@ -585,40 +655,54 @@ namespace DotMaysWind.Office
         #endregion
 
         #region 辅助方法
-        protected UInt32 GetNextSectorID(UInt32 sectorID)
+        protected void LoadEntry(DirectoryEntry entry, Action<Stream, BinaryReader> action)
         {
-            UInt32 sectorInFile = this._fatSectors[(Int32)(sectorID / 128)];
-            this._stream.Seek(this.GetSectorOffset(sectorInFile) + 4 * (sectorID % 128), SeekOrigin.Begin);
-
-            return this._reader.ReadUInt32();
-        }
-
-        protected UInt32 GetNextMiniSectorID(UInt32 miniSectorID)
-        {
-            UInt32 sectorInFile = this._minifatSectors[(Int32)(miniSectorID / 128)];
-            this._stream.Seek(this.GetSectorOffset(sectorInFile) + 4 * (miniSectorID % 128), SeekOrigin.Begin);
-
-            return this._reader.ReadUInt32();
-        }
-
-        protected Int64 GetEntryOffset(DirectoryEntry entry)
-        {
-            if (entry.Length >= this._miniCutoffSize)
+            if (this._entryData == null)
             {
-                return GetSectorOffset(entry.SectorID);
+                return;
+            }
+
+            using (MemoryStream stream = new MemoryStream(this._entryData[entry.EntryID]))
+            {
+                BinaryReader reader = new BinaryReader(stream);
+
+                action(stream, reader);
+
+                reader.Close();
+                reader.Dispose();
+            }
+        }
+
+        protected Int64 GetSectorOffset(UInt32 sectorID, Boolean isNormalSector)
+        {
+            if (isNormalSector)
+            {
+                return GetNormalSectorOffset(sectorID);
             }
             else
             {
-                return GetMiniSectorOffset(entry.SectorID);
+                return GetMiniSectorOffset(sectorID);
             }
         }
 
-        protected Int64 GetSectorOffset(UInt32 sectorID)
+        protected UInt32 GetNextSectorID(UInt32 sectorID, Boolean isNormalSector)
+        {
+            if (isNormalSector)
+            {
+                return GetNextNormalSectorID(sectorID);
+            }
+            else
+            {
+                return GetNextMiniSectorID(sectorID);
+            }
+        }
+
+        private Int64 GetNormalSectorOffset(UInt32 sectorID)
         {
             return HeaderSize + this._sectorSize * sectorID;
         }
 
-        protected Int64 GetMiniSectorOffset(UInt32 miniSectorID)
+        private Int64 GetMiniSectorOffset(UInt32 miniSectorID)
         {
             UInt32 sectorID = this._miniSectors[(Int32)((miniSectorID * this._miniSectorSize) / this._sectorSize)];
             UInt32 offset = (UInt32)((miniSectorID * this._miniSectorSize) % this._sectorSize);
@@ -626,10 +710,26 @@ namespace DotMaysWind.Office
             return HeaderSize + this._sectorSize * sectorID + offset;
         }
 
-        protected Int64 GetDirectoryEntryOffset(UInt32 entryID)
+        private UInt32 GetNextNormalSectorID(UInt32 sectorID)
+        {
+            UInt32 sectorInFile = this._fatSectors[(Int32)(sectorID / 128)];
+            this._stream.Seek(this.GetNormalSectorOffset(sectorInFile) + 4 * (sectorID % 128), SeekOrigin.Begin);
+
+            return this._reader.ReadUInt32();
+        }
+
+        private UInt32 GetNextMiniSectorID(UInt32 miniSectorID)
+        {
+            UInt32 sectorInFile = this._minifatSectors[(Int32)(miniSectorID / 128)];
+            this._stream.Seek(this.GetNormalSectorOffset(sectorInFile) + 4 * (miniSectorID % 128), SeekOrigin.Begin);
+
+            return this._reader.ReadUInt32();
+        }
+
+        private Int64 GetDirectoryEntryOffset(UInt32 entryID)
         {
             UInt32 sectorID = this._dirSectors[(Int32)(entryID * CompoundBinaryFile.DirectoryEntrySize / this._sectorSize)];
-            return this.GetSectorOffset(sectorID) + (entryID * CompoundBinaryFile.DirectoryEntrySize) % this._sectorSize;
+            return this.GetNormalSectorOffset(sectorID) + (entryID * CompoundBinaryFile.DirectoryEntrySize) % this._sectorSize;
         }
         #endregion
     }

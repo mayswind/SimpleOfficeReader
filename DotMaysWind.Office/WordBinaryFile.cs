@@ -149,37 +149,37 @@ namespace DotMaysWind.Office
                 return;
             }
 
-            Int64 entryStart = this.GetEntryOffset(entry);
-            this._stream.Seek(entryStart, SeekOrigin.Begin);
-
-            this.ReadFileInformationBlock();
+            this.LoadEntry(entry, new Action<Stream, BinaryReader>((stream, reader) =>
+            {
+                this.ReadFileInformationBlock(stream, reader);
+            }));
         }
 
         #region 读取FileInformationBlock
-        private void ReadFileInformationBlock()
+        private void ReadFileInformationBlock(Stream stream, BinaryReader reader)
         {
-            this.ReadFibBase();
-            this.ReadFibRgW97();
-            this.ReadFibRgLw97();
-            this.ReadFibRgFcLcb();
-            this.ReadFibRgCswNew();
+            this.ReadFibBase(stream, reader);
+            this.ReadFibRgW97(stream, reader);
+            this.ReadFibRgLw97(stream, reader);
+            this.ReadFibRgFcLcb(stream, reader);
+            this.ReadFibRgCswNew(stream, reader);
         }
 
         #region FibBase
-        private void ReadFibBase()
+        private void ReadFibBase(Stream stream, BinaryReader reader)
         {
-            UInt16 wIdent = this._reader.ReadUInt16();
+            UInt16 wIdent = reader.ReadUInt16();
             if (wIdent != 0xA5EC)
             {
                 throw new Exception("This file is not \".doc\" file.");
             }
 
-            this._nFib = this._reader.ReadUInt16();
-            this._reader.ReadUInt16();//unused
-            this._reader.ReadUInt16();//lid
-            this._reader.ReadUInt16();//pnNext
+            this._nFib = reader.ReadUInt16();
+            reader.ReadUInt16();//unused
+            reader.ReadUInt16();//lid
+            reader.ReadUInt16();//pnNext
 
-            UInt16 flags = this._reader.ReadUInt16();
+            UInt16 flags = reader.ReadUInt16();
             this._isComplexFile = BitHelper.GetBitFromInteger(flags, 2);
             this._hasPictures = BitHelper.GetBitFromInteger(flags, 3);
             this._isEncrypted = BitHelper.GetBitFromInteger(flags, 8);
@@ -195,70 +195,70 @@ namespace DotMaysWind.Office
                 throw new Exception("Do not support the encvypted file.");
             }
 
-            this._stream.Seek(32 - 12, SeekOrigin.Current);
+            stream.Seek(32 - 12, SeekOrigin.Current);
         }
         #endregion
 
         #region FibRgW97
-        private void ReadFibRgW97()
+        private void ReadFibRgW97(Stream stream, BinaryReader reader)
         {
-            UInt16 count = this._reader.ReadUInt16();
+            UInt16 count = reader.ReadUInt16();
 
             if (count != 0x000E)
             {
                 throw new Exception("File has been broken (FibRgW97 length is INVALID).");
             }
 
-            this._stream.Seek(26, SeekOrigin.Current);
-            this._lidFE = this._reader.ReadUInt16();
+            stream.Seek(26, SeekOrigin.Current);
+            this._lidFE = reader.ReadUInt16();
         }
         #endregion
 
         #region FibRgLw97
-        private void ReadFibRgLw97()
+        private void ReadFibRgLw97(Stream stream, BinaryReader reader)
         {
-            UInt16 count = this._reader.ReadUInt16();
+            UInt16 count = reader.ReadUInt16();
 
             if (count != 0x0016)
             {
                 throw new Exception("File has been broken (FibRgLw97 length is INVALID).");
             }
 
-            this._cbMac = this._reader.ReadInt32();
-            this._reader.ReadInt32();//reserved1
-            this._reader.ReadInt32();//reserved2
-            this._ccpText = this._reader.ReadInt32();
-            this._ccpFtn = this._reader.ReadInt32();
-            this._ccpHdd = this._reader.ReadInt32();
-            this._reader.ReadInt32();//reserved3
-            this._ccpAtn = this._reader.ReadInt32();
-            this._ccpEdn = this._reader.ReadInt32();
-            this._ccpTxbx = this._reader.ReadInt32();
-            this._ccpHdrTxbx = this._reader.ReadInt32();
+            this._cbMac = reader.ReadInt32();
+            reader.ReadInt32();//reserved1
+            reader.ReadInt32();//reserved2
+            this._ccpText = reader.ReadInt32();
+            this._ccpFtn = reader.ReadInt32();
+            this._ccpHdd = reader.ReadInt32();
+            reader.ReadInt32();//reserved3
+            this._ccpAtn = reader.ReadInt32();
+            this._ccpEdn = reader.ReadInt32();
+            this._ccpTxbx = reader.ReadInt32();
+            this._ccpHdrTxbx = reader.ReadInt32();
 
-            this._stream.Seek(44, SeekOrigin.Current);
+            stream.Seek(44, SeekOrigin.Current);
         }
         #endregion
 
         #region FibRgFcLcb
-        private void ReadFibRgFcLcb()
+        private void ReadFibRgFcLcb(Stream stream, BinaryReader reader)
         {
-            UInt16 count = this._reader.ReadUInt16();
-            this._stream.Seek(66 * 4, SeekOrigin.Current);
+            UInt16 count = reader.ReadUInt16();
+            stream.Seek(66 * 4, SeekOrigin.Current);
 
-            this._fcClx = this._reader.ReadUInt32();
-            this._lcbClx = this._reader.ReadUInt32();
+            this._fcClx = reader.ReadUInt32();
+            this._lcbClx = reader.ReadUInt32();
 
-            this._stream.Seek((count * 2 - 68) * 4, SeekOrigin.Current);
+            stream.Seek((count * 2 - 68) * 4, SeekOrigin.Current);
         }
         #endregion
 
         #region FibRgCswNew
-        private void ReadFibRgCswNew()
+        private void ReadFibRgCswNew(Stream stream, BinaryReader reader)
         {
-            UInt16 count = this._reader.ReadUInt16();
-            this._nFib = this._reader.ReadUInt16();
-            this._stream.Seek((count - 1) * 2, SeekOrigin.Current);
+            UInt16 count = reader.ReadUInt16();
+            this._nFib = reader.ReadUInt16();
+            stream.Seek((count - 1) * 2, SeekOrigin.Current);
         }
         #endregion
         #endregion
@@ -274,50 +274,53 @@ namespace DotMaysWind.Office
                 return;
             }
 
-            Int64 pieceTableStart = this.GetEntryOffset(entry) + this._fcClx;
-            Int64 pieceTableEnd = pieceTableStart + this._lcbClx;
-            this._stream.Seek(pieceTableStart, SeekOrigin.Begin);
-
-            Byte clxt = this._reader.ReadByte();
-            Int32 prcLen = 0;
-
-            //判断如果是Prc不是Pcdt
-            while (clxt == 0x01 && this._stream.Position < pieceTableEnd)
+            this.LoadEntry(entry, new Action<Stream, BinaryReader>((stream, reader) =>
             {
-                this._stream.Seek(prcLen, SeekOrigin.Current);
-                clxt = this._reader.ReadByte();
-                prcLen = this._reader.ReadInt32();
-            }
+                Int64 pieceTableStart = this._fcClx;
+                Int64 pieceTableEnd = pieceTableStart + this._lcbClx;
+                stream.Seek(pieceTableStart, SeekOrigin.Begin);
 
-            if (clxt != 0x02)
-            {
-                throw new Exception("There's no content in this file.");
-            }
+                Byte clxt = reader.ReadByte();
+                Int32 prcLen = 0;
 
-            UInt32 size = this._reader.ReadUInt32();
-            UInt32 count = (size - 4) / 12;
+                //判断如果是Prc不是Pcdt
+                while (clxt == 0x01 && stream.Position < pieceTableEnd)
+                {
+                    stream.Seek(prcLen, SeekOrigin.Current);
+                    clxt = reader.ReadByte();
+                    prcLen = reader.ReadInt32();
+                }
 
-            this._lstPieceStartPosition = new List<UInt32>();
-            this._lstPieceEndPosition = new List<UInt32>();
-            this._lstPieceElement = new List<PieceElement>();
+                if (clxt != 0x02)
+                {
+                    throw new Exception("There's no content in this file.");
+                }
 
-            for (Int32 i = 0; i < count; i++)
-            {
-                this._lstPieceStartPosition.Add(this._reader.ReadUInt32());
-                this._lstPieceEndPosition.Add(this._reader.ReadUInt32());
-                this._stream.Seek(-4, SeekOrigin.Current);
-            }
+                UInt32 size = reader.ReadUInt32();
+                UInt32 count = (size - 4) / 12;
 
-            this._stream.Seek(4, SeekOrigin.Current);
+                this._lstPieceStartPosition = new List<UInt32>();
+                this._lstPieceEndPosition = new List<UInt32>();
+                this._lstPieceElement = new List<PieceElement>();
 
-            for (Int32 i = 0; i < count; i++)
-            {
-                UInt16 info = this._reader.ReadUInt16();
-                UInt32 fcCompressed = this._reader.ReadUInt32();
-                UInt16 prm = this._reader.ReadUInt16();
+                for (Int32 i = 0; i < count; i++)
+                {
+                    this._lstPieceStartPosition.Add(reader.ReadUInt32());
+                    this._lstPieceEndPosition.Add(reader.ReadUInt32());
+                    stream.Seek(-4, SeekOrigin.Current);
+                }
 
-                this._lstPieceElement.Add(new PieceElement(info, fcCompressed, prm));
-            }
+                stream.Seek(4, SeekOrigin.Current);
+
+                for (Int32 i = 0; i < count; i++)
+                {
+                    UInt16 info = reader.ReadUInt16();
+                    UInt32 fcCompressed = reader.ReadUInt32();
+                    UInt16 prm = reader.ReadUInt16();
+
+                    this._lstPieceElement.Add(new PieceElement(info, fcCompressed, prm));
+                }
+            }));
         }
         #endregion
 
@@ -327,33 +330,36 @@ namespace DotMaysWind.Office
             StringBuilder sb = new StringBuilder();
             DirectoryEntry entry = this._dirRootEntry.GetChild("WordDocument");
 
-            for (Int32 i = 0; i < this._lstPieceElement.Count; i++)
+            this.LoadEntry(entry, new Action<Stream, BinaryReader>((stream, reader) =>
             {
-                Int64 pieceStart = this.GetEntryOffset(entry) + this._lstPieceElement[i].Offset;
-                this._stream.Seek(pieceStart, SeekOrigin.Begin);
+                for (Int32 i = 0; i < this._lstPieceElement.Count; i++)
+                {
+                    Int64 pieceStart = this._lstPieceElement[i].Offset;
+                    stream.Seek(pieceStart, SeekOrigin.Begin);
 
-                Int32 length = (Int32)((this._lstPieceElement[i].IsUnicode ? 2 : 1) * (this._lstPieceEndPosition[i] - this._lstPieceStartPosition[i]));
-                Byte[] data = this._reader.ReadBytes(length);
-                String content = StringHelper.GetString(this._lstPieceElement[i].IsUnicode, data);
-                sb.Append(content);
-            }
+                    Int32 length = (Int32)((this._lstPieceElement[i].IsUnicode ? 2 : 1) * (this._lstPieceEndPosition[i] - this._lstPieceStartPosition[i]));
+                    Byte[] data = reader.ReadBytes(length);
+                    String content = StringHelper.GetString(this._lstPieceElement[i].IsUnicode, data);
+                    sb.Append(content);
+                }
 
-            String allContent = sb.ToString();
-            Int32 paragraphEnd = this._ccpText;
-            Int32 footnoteEnd = paragraphEnd + this._ccpFtn;
-            Int32 headerEnd = footnoteEnd + this._ccpHdd;
-            Int32 commentEnd = headerEnd + this._ccpAtn;
-            Int32 endnoteEnd = commentEnd + this._ccpEdn;
-            Int32 textboxEnd = endnoteEnd + this._ccpTxbx;
-            Int32 headerTextboxEnd = textboxEnd + this._ccpHdrTxbx;
+                String allContent = sb.ToString();
+                Int32 paragraphEnd = this._ccpText;
+                Int32 footnoteEnd = paragraphEnd + this._ccpFtn;
+                Int32 headerEnd = footnoteEnd + this._ccpHdd;
+                Int32 commentEnd = headerEnd + this._ccpAtn;
+                Int32 endnoteEnd = commentEnd + this._ccpEdn;
+                Int32 textboxEnd = endnoteEnd + this._ccpTxbx;
+                Int32 headerTextboxEnd = textboxEnd + this._ccpHdrTxbx;
 
-            this._paragraphText = StringHelper.ReplaceString(allContent.Substring(0, this._ccpText));
-            this._footnoteText = StringHelper.ReplaceString(allContent.Substring(paragraphEnd, this._ccpFtn));
-            this._headerText = StringHelper.ReplaceString(allContent.Substring(footnoteEnd, this._ccpHdd));
-            this._commentText = StringHelper.ReplaceString(allContent.Substring(headerEnd, this._ccpAtn));
-            this._endnoteText = StringHelper.ReplaceString(allContent.Substring(commentEnd, this._ccpEdn));
-            this._textboxText = StringHelper.ReplaceString(allContent.Substring(endnoteEnd, this._ccpTxbx));
-            this._headerTextboxText = StringHelper.ReplaceString(allContent.Substring(textboxEnd, this._ccpHdrTxbx));
+                this._paragraphText = StringHelper.ReplaceString(allContent.Substring(0, this._ccpText));
+                this._footnoteText = StringHelper.ReplaceString(allContent.Substring(paragraphEnd, this._ccpFtn));
+                this._headerText = StringHelper.ReplaceString(allContent.Substring(footnoteEnd, this._ccpHdd));
+                this._commentText = StringHelper.ReplaceString(allContent.Substring(headerEnd, this._ccpAtn));
+                this._endnoteText = StringHelper.ReplaceString(allContent.Substring(commentEnd, this._ccpEdn));
+                this._textboxText = StringHelper.ReplaceString(allContent.Substring(endnoteEnd, this._ccpTxbx));
+                this._headerTextboxText = StringHelper.ReplaceString(allContent.Substring(textboxEnd, this._ccpHdrTxbx));
+            }));
         }
         #endregion
     }

@@ -17,7 +17,7 @@ namespace DotMaysWind.Office.Entity
         private UInt32 _entryID;
         private String _entryName;
         private DirectoryEntryType _entryType;
-        private UInt32 _sectorID;
+        private UInt32 _firstSectorID;
         private UInt32 _length;
 
         private DirectoryEntry _parent;
@@ -50,11 +50,11 @@ namespace DotMaysWind.Office.Entity
         }
 
         /// <summary>
-        /// 获取DirectoryEntry的SectorID
+        /// 获取DirectoryEntry的第一个SectorID
         /// </summary>
-        public UInt32 SectorID
+        public UInt32 FirstSectorID
         {
-            get { return this._sectorID; }
+            get { return this._firstSectorID; }
         }
 
         /// <summary>
@@ -90,14 +90,14 @@ namespace DotMaysWind.Office.Entity
         /// <param name="entryID">DirectoryEntryID</param>
         /// <param name="entryName">DirectoryEntry名称</param>
         /// <param name="entryType">DirectoryEntry类型</param>
-        /// <param name="sectorID">SectorID</param>
+        /// <param name="firstSectorID">第一个SectorID</param>
         /// <param name="length">内容大小</param>
-        public DirectoryEntry(DirectoryEntry parent, UInt32 entryID, String entryName, DirectoryEntryType entryType, UInt32 sectorID, UInt32 length)
+        public DirectoryEntry(DirectoryEntry parent, UInt32 entryID, String entryName, DirectoryEntryType entryType, UInt32 firstSectorID, UInt32 length)
         {
             this._entryID = entryID;
             this._entryName = entryName;
             this._entryType = entryType;
-            this._sectorID = sectorID;
+            this._firstSectorID = firstSectorID;
             this._length = length;
             this._parent = parent;
 
@@ -130,6 +130,11 @@ namespace DotMaysWind.Office.Entity
             }
 
             return null;
+        }
+
+        public override String ToString()
+        {
+            return String.Format("{0}, {1}", base.ToString(), this._entryName);
         }
         #endregion
     }
