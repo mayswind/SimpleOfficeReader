@@ -1,19 +1,16 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="3.5" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.30729</ProductVersion>
-    <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{DBDD5BF8-FF40-4CCC-AA34-E27A6B6DCDBC}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>DotMaysWind.Office</RootNamespace>
     <AssemblyName>DotMaysWind.Office</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <TargetFrameworkSubset>
-    </TargetFrameworkSubset>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -36,32 +33,30 @@
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.XML" />
-    <Reference Include="WindowsBase">
-      <RequiredTargetFramework>3.0</RequiredTargetFramework>
-    </Reference>
+    <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="IOfficeFile.cs" />
-    <Compile Include="WordOOXMLFile.cs" />
+    <Compile Include="CompoundBinaryFile.cs" />
+    <Compile Include="Entity\DirectoryEntry.cs" />
+    <Compile Include="Entity\PieceElement.cs" />
+    <Compile Include="Entity\PowerPointRecord.cs" />
     <Compile Include="Helper\BitHelper.cs" />
     <Compile Include="Helper\NodeHelper.cs" />
     <Compile Include="Helper\StringHelper.cs" />
-    <Compile Include="Entity\DirectoryEntry.cs" />
-    <Compile Include="WordBinaryFile.cs" />
-    <Compile Include="Entity\PieceElement.cs" />
-    <Compile Include="Entity\PowerPointRecord.cs" />
+    <Compile Include="IOfficeFile.cs" />
     <Compile Include="IPowerPointFile.cs" />
     <Compile Include="IWordFile.cs" />
+    <Compile Include="OfficeFileFactory.cs" />
     <Compile Include="OfficeOpenXMLFile.cs" />
     <Compile Include="PowerPointFile.cs" />
     <Compile Include="PowerPointOOXMLFile.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Summary\DocumentSummaryInformation.cs" />
     <Compile Include="Summary\DocumentSummaryInformationType.cs" />
-    <Compile Include="CompoundBinaryFile.cs" />
-    <Compile Include="OfficeFileFactory.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Summary\SummaryInformation.cs" />
     <Compile Include="Summary\SummaryInformationType.cs" />
+    <Compile Include="WordBinaryFile.cs" />
+    <Compile Include="WordOOXMLFile.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

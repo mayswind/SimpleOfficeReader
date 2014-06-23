@@ -1,6 +1,8 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+VisualStudioVersion = 11.0.30501.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotMaysWind.OfficeReader", "DotMaysWind.OfficeReader\DotMaysWind.OfficeReader.csproj", "{28767CD6-4ED2-46D1-A5BE-C01E84CC1AC7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotMaysWind.Office", "DotMaysWind.Office\DotMaysWind.Office.csproj", "{DBDD5BF8-FF40-4CCC-AA34-E27A6B6DCDBC}"
