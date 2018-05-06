@@ -24,6 +24,10 @@ namespace DotMaysWind.Office.Entity
 
     public class PowerPointRecord
     {
+        #region 常量
+        private const UInt32 ContainerRecordVersion = 0xF;
+        #endregion
+
         #region 字段
         private UInt16 _recVer;
         private UInt16 _recInstance;
@@ -121,7 +125,7 @@ namespace DotMaysWind.Office.Entity
             this._deepth = (parent == null ? 0 : parent._deepth + 1);
             this._parent = parent;
 
-            if (_recVer == 0xF)
+            if (_recVer == ContainerRecordVersion)
             {
                 this._children = new List<PowerPointRecord>();
             }
