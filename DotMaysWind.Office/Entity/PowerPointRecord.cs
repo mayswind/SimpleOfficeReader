@@ -118,7 +118,7 @@ namespace DotMaysWind.Office.Entity
         public PowerPointRecord(PowerPointRecord parent, UInt16 version, UInt16 type, UInt32 length, Int64 offset)
         {
             this._recVer = (UInt16)(version & 0xF);
-            this._recInstance = (UInt16)(version & 0xFFF0);
+            this._recInstance = (UInt16)((version & 0xFFF0) >> 4);
             this._recType = (RecordType)type;
             this._recLen = length;
             this._offset = offset;
